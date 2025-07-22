@@ -5,57 +5,51 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "web_site/html.h"
+#include "web_site/html.h" // Presumindo que o html está aqui
 #include "web_site.h"
+// 1. INCLUA OS NOVOS ARQUIVOS HTML
+#include "index_html.h"
+#include "charts_html.h"
 
-char ip_display[24] = "Sem IP";
 
-#define WIFI_SSID "Mariana_Camila"
-#define WIFI_PASS "maricamila123"
-// Declaração de que as variáveis existem em outro lugar
-extern float altitude;
+
+// Declaração de variáveis externas que vêm do main.c
+extern void update_orange_alert_limits(float min, float max);
 extern bool pump_active;
-struct nivel_agua nivelConfig = {250, 550};
+char ip_display[24] = "Conectando...";
 
-struct http_state {
-    char response[5300];
-    size_t len;
-    size_t sent;
-};
-
+// Estrutura para os limites, se necessário (parece ser usada apenas aqui)
 
 // Variáveis estáticas para guardar os últimos dados recebidos do main.c
 static float g_temp_bmp = 0.0f;
 static float g_temp_aht = 0.0f;
 static float g_humidity = 0.0f;
 static float g_altitude = 0.0f;
+static float g_orange_min = 20.0f;
+static float g_orange_max = 30.0f;
+
+#define WIFI_SSID "Mariana_Camila" // Coloque seu Wi-Fi aqui
+#define WIFI_PASS "maricamila123"  // Coloque sua senha aqui
+
+// Estrutura para o estado da conexão HTTP
+struct http_state {
+    char response[6000]; // Aumentado para comportar a página HTML inteira
+    size_t len;
+    size_t sent;
+};
 
 
-// Dentro de web_site.c
+// --- BLOCO DE CÓDIGO REMOVIDO ---
+// As funções cgi_dados_handler, cgi_set_orange_limits_handler e a array cgi_handlers
+// foram removidas pois pertenciam a uma outra arquitetura de servidor (httpd)
+// e causavam os erros de compilação. A lógica delas já está na função http_recv.
 
-// Exemplo de um CGI Handler para a URL /dados.json
-const char * cgi_dados_handler(int iIndex, int iNumParams, char *pcParam[], char *pcValue[]) {
-    // Buffer para criar a string JSON
-    static char json_buffer[256];
 
-    // Formata a string JSON com os valores atuais das variáveis globais
-    snprintf(json_buffer, sizeof(json_buffer),
-             "{\"temp_bmp\": %.2f, \"temp_aht\": %.2f, \"humidity\": %.2f, \"altitude\": %.1f}",
-             g_temp_bmp, g_temp_aht, g_humidity, g_altitude);
-
-    // Retorna o ponteiro para o buffer com o JSON
-    return json_buffer;
-}
-
-// Em algum lugar na inicialização, você deve registrar este handler:
-// static const tCGI cgi_handlers[] = {
-//     {"/dados.json", cgi_dados_handler},
-// };
-// http_set_cgi_handlers(cgi_handlers, 1);
-
+// Callback chamado quando os dados são enviados com sucesso
 static err_t http_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     struct http_state *hs = (struct http_state *)arg;
     hs->sent += len;
+
     if (hs->sent >= hs->len) {
         tcp_close(tpcb);
         free(hs);
@@ -63,8 +57,7 @@ static err_t http_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
     return ERR_OK;
 }
 
-
-
+// Callback principal, chamado quando uma requisição é recebida
 static err_t http_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     if (!p) {
         tcp_close(tpcb);
@@ -75,99 +68,67 @@ static err_t http_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
     struct http_state *hs = malloc(sizeof(struct http_state));
     if (!hs) {
         pbuf_free(p);
-        tcp_close(tpcb);
         tcp_recved(tpcb, p->tot_len);
+        tcp_close(tpcb);
         return ERR_MEM;
     }
     hs->sent = 0;
 
-// Dentro da função http_recv
+    const char* html_to_send = NULL; // Ponteiro para o HTML a ser enviado
 
-   if (strstr(req, "GET /dados")) {
- printf("Recebida requisição GET /dados\n");
-
-        // ALINHA DE DEBUG USANDO AS VARIÁVEIS CORRETAS
- printf("Valores atuais: temp_bmp=%.2f, temp_aht=%.2f, umidade=%.2f, altitude=%.2f, bomba=%d\n",
-g_temp_bmp, g_temp_aht, g_humidity, g_altitude, pump_active ? 1 : 0);
-
- char json_payload[128];
-        // ALTERE AQUI PARA USAR AS VARIÁVEIS g_...
- int json_len = snprintf(json_payload, sizeof(json_payload),
-"{\"temperatura_bmp\":%.2f, \"temperatura_aht\":%.2f, \"umidade\":%.2f, \"altitude\":%.2f, \"bomba\":%d}\r\n",
- g_temp_bmp, g_temp_aht, g_humidity, g_altitude, pump_active ? 1 : 0);
-
-        // O resto da função continua igual...
-hs->len = snprintf(hs->response, sizeof(hs->response),
-                    // ...
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: application/json\r\n"
-            "Content-Length: %d\r\n"
-            "Access-Control-Allow-Origin: *\r\n" // Adicionado CORS
-            "Connection: close\r\n"
-            "\r\n"
-            "%s",
-            json_len, json_payload);
-    }
-    else if (strstr(req, "GET /valor_min_max/") != NULL) {
-        printf("Recebida requisição GET /valor_min_max/\n");
-        char *pos = strstr(req, "/valor_min_max/");
-        if (pos) {
-            pos += strlen("/valor_min_max/");
-            char valores[32];
-            strncpy(valores, pos, sizeof(valores) - 1);
-            valores[sizeof(valores) - 1] = '\0';
-            char *token = strtok(valores, "s");
-            int minimo = 0;
-            int maximo = 0;
-            if (token != NULL) {
-                minimo = atoi(token);
-                token = strtok(NULL, "s");
-                if (token != NULL) {
-                    maximo = atoi(token);
-                    nivelConfig.min = (uint16_t)minimo;
-                    nivelConfig.max = (uint16_t)maximo;
-                    printf("Novo Min: %d | Novo Max: %d\n", nivelConfig.min, nivelConfig.max);
-                }
-            }
-        }
+    // Endpoint para obter os dados em JSON (usado por ambas as páginas)
+// Bloco CORRIGIDO
+if (strstr(req, "GET /dados")) {
+    char json_payload[256];
+    int json_len = snprintf(json_payload, sizeof(json_payload),
+                            "{\"temperatura_bmp\":%.2f,\"temperatura_aht\":%.2f,\"umidade\":%.2f,\"altitude\":%.2f,\"bomba\":%d,\"orange_min\":%.1f,\"orange_max\":%.1f}",
+                            g_temp_bmp, g_temp_aht, g_humidity, g_altitude, pump_active ? 1 : 0, g_orange_min, g_orange_max);
+    // ... resto do código ...
         hs->len = snprintf(hs->response, sizeof(hs->response),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain\r\n"
-            "Access-Control-Allow-Origin: *\r\n" // Adicionado CORS
-            "Connection: close\r\n"
-            "\r\n"
-            "OK");
-    }
-    else {
-        printf("Recebida requisição GET para página principal\n");
-        char html_com_dados[6000]; // Aumentado para evitar truncamento
-        snprintf(html_com_dados, sizeof(html_com_dados), html);
+                           "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n%s",
+                           json_len, json_payload);
 
+    // Endpoint para a página de gráficos
+    } else if (strstr(req, "GET /charts.html")) {
+        html_to_send = charts_html;
+
+    // Endpoint para configurar os limites via POST
+    } else if (strstr(req, "POST /set_orange_limits")) {
+        // ... (lógica do POST continua a mesma) ...
+        char *body = strstr(req, "\r\n\r\n");
+        if(body){body+=4;float min=0,max=0;char*param=strtok(body,"&");while(param){if(strncmp(param,"orange_min=",11)==0){min=atof(param+11);}else if(strncmp(param,"orange_max=",11)==0){max=atof(param+11);}param=strtok(NULL,"&");}update_orange_alert_limits(min,max);}
+        hs->len = snprintf(hs->response, sizeof(hs->response), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+
+    // Se não for nenhuma das requisições acima, serve a página principal
+    } else {
+        html_to_send = index_html;
+    }
+
+    // Se um HTML foi selecionado, prepara a resposta HTTP
+    if (html_to_send) {
         hs->len = snprintf(hs->response, sizeof(hs->response),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Content-Length: %d\r\n"
-            "Access-Control-Allow-Origin: *\r\n" // Adicionado CORS
-            "Connection: close\r\n"
-            "\r\n"
-            "%s",
-            (int)strlen(html_com_dados), html_com_dados);
+                           "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
+                           (int)strlen(html_to_send), html_to_send);
     }
 
+    // Envia a resposta
     tcp_arg(tpcb, hs);
     tcp_sent(tpcb, http_sent);
     tcp_write(tpcb, hs->response, hs->len, TCP_WRITE_FLAG_COPY);
     tcp_output(tpcb);
-
+    
+    tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
     return ERR_OK;
 }
 
+// Callback para aceitar novas conexões
 static err_t connection_callback(void *arg, struct tcp_pcb *newpcb, err_t err) {
     tcp_recv(newpcb, http_recv);
     return ERR_OK;
 }
 
+// Inicia o servidor TCP na porta 80
 static void start_http_server(void) {
     struct tcp_pcb *pcb = tcp_new();
     if (!pcb) {
@@ -183,33 +144,41 @@ static void start_http_server(void) {
     printf("Servidor HTTP rodando na porta 80...\n");
 }
 
+// Função principal de inicialização do Wi-Fi e do servidor
 void init_web_site(void) {
     if (cyw43_arch_init()) {
-        printf("Erro\n");
+        printf("Erro ao inicializar CYW43\n");
         return;
     }
 
     cyw43_arch_enable_sta_mode();
+    printf("Conectando ao Wi-Fi %s...\n", WIFI_SSID);
+
     if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASS, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
-        printf("Erro ao se conectar\n");
+        printf("Erro ao se conectar ao Wi-Fi\n");
         return;
     }
-
-    uint8_t *ip = (uint8_t *)&(cyw43_state.netif[0].ip_addr.addr);
-    snprintf(ip_display, sizeof(ip_display), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    
+    printf("Conectado com sucesso!\n");
+    
+    // Obtém e exibe o endereço IP
+    uint32_t ip_addr = cyw43_state.netif[0].ip_addr.addr;
+    snprintf(ip_display, sizeof(ip_display), "%lu.%lu.%lu.%lu", 
+             ip_addr & 0xFF, (ip_addr >> 8) & 0xFF, (ip_addr >> 16) & 0xFF, (ip_addr >> 24) & 0xFF);
     printf("IP obtido: %s\n", ip_display);
 
     start_http_server();
+
+    // --- LINHA REMOVIDA ---
+    // A chamada a http_set_cgi_handlers foi removida pois causava erro de compilação.
 }
 
-// Dentro de web_site.c
-
-
-
-// Esta função é chamada pelo main.c para atualizar os valores
-void update_web_dados(float temp_bmp, float temp_aht, float humidity, float altitude) {
+// Função chamada pelo main.c para atualizar os dados dos sensores
+void update_web_dados(float temp_bmp, float temp_aht, float humidity, float altitude, float orange_min, float orange_max) {
     g_temp_bmp = temp_bmp;
     g_temp_aht = temp_aht;
     g_humidity = humidity;
     g_altitude = altitude;
+    g_orange_min = orange_min;
+    g_orange_max = orange_max;
 }

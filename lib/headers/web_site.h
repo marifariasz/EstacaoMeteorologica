@@ -1,7 +1,7 @@
 #ifndef WEB_SITE_H
 #define WEB_SITE_H
 
-#include <stdint.h>
+#include "lwip/tcp.h"
 
 struct nivel_agua {
     uint16_t min;
@@ -10,13 +10,9 @@ struct nivel_agua {
 
 extern struct nivel_agua nivelConfig;
 extern char ip_display[24];
-extern float temperatura_bmp;
-extern float temperatura_aht;
-extern float umidade;
-extern float altitude;
-extern bool pump_active;
 
 void init_web_site(void);
-void update_web_dados(float temp_bmp, float temp_aht, float umi, float alt);
+void update_web_dados(float temp_bmp, float temp_aht, float humidity, float altitude, float orange_min, float orange_max);
+void update_orange_alert_limits(float min, float max);
 
 #endif

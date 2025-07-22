@@ -46,8 +46,6 @@ extern char ip_display[24];
 #define DISPLAY_UPDATE_MS 1000
 #define BUZZER_INTERVAL_MS 2000
 #define RAIN_THRESHOLD 80.0
-#define ORANGE_ALERT_MIN 20.0
-#define ORANGE_ALERT_MAX 30.0
 
 // Variáveis globais
 bool pump_active = false;
@@ -58,6 +56,8 @@ absolute_time_t last_button_time;
 float temperature = 0;
 float pressure = 0;
 ssd1306_t oled;
+float orange_alert_min = 20.0; // Limite mínimo do alerta laranja (dinâmico)
+float orange_alert_max = 30.0; // Limite máximo do alerta laranja (dinâmico)
 
 // Estrutura para LEDs
 struct pixel_t {
@@ -125,6 +125,18 @@ void handle_button(void);
 void control_alerts(float temperature, float humidity);
 void update_display(ssd1306_t *ssd, float temperature, float altitude, AHT20_Data *data, bool cor, char *ip_display);
 double calculate_altitude(double pressure);
+void update_orange_alert_limits(float min, float max); // Nova função
+
+// Função para atualizar limites do alerta laranja
+void update_orange_alert_limits(float min, float max) {
+    if (min >= 0.0 && max <= 100.0 && min < max) {
+        orange_alert_min = min;
+        orange_alert_max = max;
+        printf("Novos limites do alerta laranja: %.1f%% - %.1f%%\n", min, max);
+    } else {
+        printf("Erro: Limites inválidos (min=%.1f, max=%.1f)\n", min, max);
+    }
+}
 
 // Funções para a matriz de LEDs
 void npSetLED(uint index, uint8_t r, uint8_t g, uint8_t b) {
@@ -272,7 +284,7 @@ void control_alerts(float temperature, float humidity) {
     }
 
     bool is_raining = (humidity > RAIN_THRESHOLD);
-    bool is_orange_alert = (humidity >= ORANGE_ALERT_MIN && humidity <= ORANGE_ALERT_MAX);
+    bool is_orange_alert = (humidity >= orange_alert_min && humidity <= orange_alert_max);
     int current_pattern = -1;
 
     if (is_raining) {
@@ -303,13 +315,13 @@ void control_alerts(float temperature, float humidity) {
         rain_frame = (rain_frame + 1) % 5;
         current_pattern = RAIN;
     } else if (is_orange_alert) {
-        printf("Alerta laranja: umidade %.2f%%\n", humidity);
-        gpio_put(RED_LED_PIN, 1);    // Vermelho ligado
-        gpio_put(GREEN_LED_PIN, 1);  // Verde ligado (laranja)
-        gpio_put(BLUE_LED_PIN, 0);   // Azul apagado
+        printf("Alerta laranja: umidade %.2f%% (limites: %.1f%% - %.1f%%)\n", humidity, orange_alert_min, orange_alert_max);
+        gpio_put(RED_LED_PIN, 1);
+        gpio_put(GREEN_LED_PIN, 1);
+        gpio_put(BLUE_LED_PIN, 0);
 
         if (absolute_time_diff_us(last_buzzer_time, current_time) > BUZZER_INTERVAL_MS * 1000) {
-            start_buzzer(BUZZER, 1500, 100); // Bipe moderado
+            start_buzzer(BUZZER, 1500, 100);
             last_buzzer_time = current_time;
         }
 
@@ -472,7 +484,7 @@ int main() {
         handle_button();
         control_alerts(temperature, data.humidity);
         update_display(&ssd, temperature, altitude, &data, cor, ip_display);
-        update_web_dados(temperature / 100.0, data.temperature, data.humidity, altitude);
+        update_web_dados(temperature / 100.0, data.temperature, data.humidity, altitude, orange_alert_min, orange_alert_max);
 
         int32_t elapsed = absolute_time_diff_us(loop_start, get_absolute_time()) / 1000;
         int32_t sleep_time = SAMPLE_INTERVAL_MS - elapsed;
