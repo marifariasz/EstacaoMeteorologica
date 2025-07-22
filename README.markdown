@@ -168,6 +168,7 @@ Bem-vindo ao projeto da **Estação Meteorológica**! Este sistema, desenvolvido
 
 ---
 
-## 🌟 Vídeo
-
-Desenvolvido para o curso **TIC37** no **CEPEDI**.
+## :arrow_forward: Vídeo no youtube mostrando o funcionamento do programa na placa Raspberry Pi Pico W
+<p align="center">
+    <a href="https>Clique aqui para acessar o vídeo</a>
+</p>
