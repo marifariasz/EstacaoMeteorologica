@@ -3,7 +3,9 @@
 Bem-vindo ao projeto da **Estação Meteorológica**! Este sistema, desenvolvido para o **Raspberry Pi Pico**, monitora condições ambientais (temperatura, umidade, pressão, altitude) e exibe alertas visuais e sonoros com base em condições predefinidas. Com uma interface web moderna, você pode visualizar dados em tempo real e configurar os limites do **alerta laranja** (umidade) de forma dinâmica! 🚨
 
 ---
-
+## :walking: Desenvolvido por:
+- Mariana Farias
+- ---
 ## 🎯 Funcionalidades
 
 - **Monitoramento Ambiental** 📊
@@ -154,11 +156,6 @@ Bem-vindo ao projeto da **Estação Meteorológica**! Este sistema, desenvolvido
 - **Chuva**: Configure `data.humidity = 85.0` e verifique LEDs piscando, animação de chuva, e buzzer.
 - **Temperatura**: Teste faixas (<20°C, 20–30°C, >30°C) via `temperature` em `station.c`.
 - **Botão**: Pressione o botão (pino 6) para desabilitar/habilitar alertas.
-
-### 4. Teste de Performance
-- Confirme que o loop principal executa a cada ~200ms (verifique logs no serial).
-- Assegure-se de que LEDs, matriz e buzzer operam sem "engasgos".
-
 ---
 
 ## ⚙️ Arquivos Principais
@@ -170,34 +167,6 @@ Bem-vindo ao projeto da **Estação Meteorológica**! Este sistema, desenvolvido
 - **`ws2818b.pio`**: Controle da matriz WS2812B.
 
 ---
-
-## 🎨 Personalizações
-
-- **Padrão da Matriz de LEDs**:
-  - Modifique o padrão do alerta laranja em `station.c` (ex.: substitua o triângulo por uma exclamação):
-    ```c
-    {{{0, 0, 0}, {0, 0, 0}, {255, 165, 0}, {0, 0, 0}, {0, 0, 0}},
-     {{0, 0, 0}, {0, 0, 0}, {255, 165, 0}, {0, 0, 0}, {0, 0, 0}},
-     {{0, 0, 0}, {0, 0, 0}, {255, 165, 0}, {0, 0, 0}, {0, 0, 0}},
-     {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
-     {{0, 0, 0}, {0, 0, 0}, {255, 165, 0}, {0, 0, 0}, {0, 0, 0}}}
-    ```
-
-- **CSS Inline**:
-  - Se o Tailwind CDN não for viável, substitua por CSS inline em `web_site/html.h`. Exemplo:
-    ```c
-    "<style>\n"
-    "body { background-color: #f3f4f6; font-family: sans-serif; }\n"
-    ".container { max-width: 800px; margin: 0 auto; padding: 16px; }\n"
-    // ...
-    "</style>\n"
-    ```
-
-- **Endpoint Unificado**:
-  - Para unificar `/valor_min_max/` e `/set_orange_limits`, modifique `web_site.c` para usar um único endpoint (ex.: GET `/config/min/max/orange_min/orange_max`).
-
----
-
 
 ## 🌟 Vídeo
 
