@@ -159,32 +159,6 @@ Bem-vindo ao projeto da **Estação Meteorológica**! Este sistema, desenvolvido
 - Confirme que o loop principal executa a cada ~200ms (verifique logs no serial).
 - Assegure-se de que LEDs, matriz e buzzer operam sem "engasgos".
 
-### 5. Debug
-- **Web**:
-  - Se a página não carregar, verifique o tamanho do buffer em `web_site.c`:
-    ```c
-    printf("Servindo página, tamanho: %d\n", (int)strlen(html_com_dados));
-    ```
-  - Veja erros no console do navegador (F12).
-- **POST**:
-  - Se `/set_orange_limits` falhar, adicione logs:
-    ```c
-    printf("Corpo do POST: %s\n", body);
-    ```
-- **I2C**:
-  - Se o AHT20 ou BMP280 falhar, use o scanner:
-    ```c
-    void i2c_scanner(i2c_inst_t *i2c) {
-        printf("Scanning I2C bus...\n");
-        for (uint8_t addr = 0; addr < 128; addr++) {
-            uint8_t data;
-            if (i2c_read_blocking(i2c, addr, &data, 1, false) >= 0) {
-                printf("Device found at 0x%02X\n", addr);
-            }
-        }
-    }
-    ```
-
 ---
 
 ## ⚙️ Arquivos Principais
